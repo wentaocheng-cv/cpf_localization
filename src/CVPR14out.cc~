@@ -1,0 +1,93 @@
+#include <vector>
+#include <set>
+#include <iostream>
+#include <fstream>
+#include <stdint.h>
+#include <string>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <sstream>
+
+#include "sfm/parse_bundler.hh"
+
+int main (int argc, char **argv)
+{
+
+	parse_bundler parser;
+
+	//not aachen
+	/*//if ( !parser.load_from_binary( argv[1], atoi(argv[2]) ) )
+    {
+    std::cerr << "ERROR: could not parse the information from bundler " << std::endl;
+    return 1;
+    }*/
+
+    //aachen
+    if ( !parser.load_from_binary( argv[1], atoi(argv[2]) ) )
+    {
+        std::cerr << "ERROR: could not parse the information from bundler " << std::endl;
+        return 1;
+    }
+
+    std::vector< feature_3D_info > &feature_infos = parser.get_feature_infos();
+    std::vector< bundler_camera >  &camera_infos = parser.get_cameras( );
+
+    uint32_t nb_cameras = parser.get_number_of_cameras();
+    uint32_t nb_points = parser.get_number_of_points();
+
+    FILE *f = fopen(argv[3], "w");
+    if (f == NULL)
+    {
+        printf("Error opening file %s for writing\n", argv[4]);
+        return 1;
+    }
+     fprintf(f, "# Bundle file v0.3\n");
+    /* Print number of cameras and points */
+    fprintf(f, "%d %d\n", nb_cameras, nb_points);
+
+    for ( uint32_t i = 0; i < nb_cameras; ++i )
+    {
+        camera_infos[i].cover = 0;
+        camera_infos[i].covered_flag = 0;
+        camera_infos[i].importance = 0;
+        //write camera info
+        fprintf(f, "%0.10e %0.10e %0.10e\n",
+                camera_infos[i].focal_length, camera_infos[i].kappa_1, camera_infos[i].kappa_2);
+        for ( int j = 0; j < 3; ++j )
+        {
+            fprintf(f, "%0.10e %0.10e %0.10e\n",
+                    camera_infos[i].rotation(j, 0),
+                    camera_infos[i].rotation(j, 1),
+                    camera_infos[i].rotation(j, 2));
+        }
+        fprintf(f, "%0.10e %0.10e %0.10e\n", camera_infos[i].translation[0], camera_infos[i].translation[1], camera_infos[i].translation[2]);
+    }
+
+
+
+    int points_number = atoi(argv[4]);
+    std::ifstream instream( argv[5], std::ios::in );
+    uint32_t current_id = 0;
+    for(int i = 0; i < points_number; i++)
+    {
+    	instream >> current_id;
+    	fprintf(f, "%0.10e %0.10e %0.10e\n",
+                feature_infos[current_id].point.x, feature_infos[current_id].point.y, feature_infos[current_id].point.z);
+        fprintf(f, "%d %d %d\n",
+                feature_infos[current_id].point.r,
+                feature_infos[current_id].point.g,
+                feature_infos[current_id].point.b);
+        fprintf(f, "%d", feature_infos[current_id].view_list.size());
+        for (uint32_t k = 0; k < feature_infos[current_id].view_list.size(); ++k)
+        {
+            fprintf(f, " %d %d %0.4f %0.4f", feature_infos[current_id].view_list[k].camera, feature_infos[current_id].view_list[k].key
+                    , feature_infos[current_id].view_list[k].x, feature_infos[current_id].view_list[k].y);
+        }
+        fprintf(f, "\n");
+    }
+
+    instream.close();
+    fclose(f);
+	return 1;
+}
